@@ -1,11 +1,16 @@
 # reddit-pull
 
+> [!NOTE]
+> **Part of [headless-kit](https://github.com/Sohwhat6420/headless-kit).** The same tool ships there as
+> [`tools/research/reddit-pull`](https://github.com/Sohwhat6420/headless-kit/tree/main/tools/research/reddit-pull),
+> next to the kit's other agent-first tools. This repository is the standalone copy, kept for anyone who wants
+> only this one file.
+
 [![test](https://github.com/Sohwhat6420/reddit-pull/actions/workflows/test.yml/badge.svg)](https://github.com/Sohwhat6420/reddit-pull/actions/workflows/test.yml)
 ![licence: MIT](https://img.shields.io/badge/licence-MIT-blue)
-![node: 18+](https://img.shields.io/badge/node-18%2B-green)
 ![dependencies: 0](https://img.shields.io/badge/dependencies-0-brightgreen)
 
-**Pull public Reddit posts and comments as JSON files, with no browser, no sign-in and no API key.** One Node file, zero dependencies.
+**Reddit as JSON files for AI agents: no browser, no sign-in, no API key.** Public posts and comments, one Node file, zero dependencies.
 
 **Why it's interesting:** Reddit answers `403` to plain HTTP clients, most AI agents' browsers refuse the domain, and the official API needs an app registration. `reddit-pull` reads the volunteer-run [Arctic Shift](https://github.com/ArthurHeitmann/arctic_shift) archive instead, pages through a date window politely (it waits out `429`s), filters locally, and prints **one JSON line** saying what it wrote, so a script or an agent can check the result without parsing prose.
 

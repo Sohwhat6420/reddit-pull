@@ -42,9 +42,9 @@ Arctic Shift mirrors Reddit and exposes it over plain HTTPS. `reddit-pull` pages
 
 | File | Contents |
 | --- | --- |
-| `<sub>.posts.json` | posts, highest score first: id, date, author, flair, score, comment count, title, url, permalink, body (first 6,000 chars) |
+| `<sub>.posts.json` | posts, highest score first: id, date, author, flair, score, comment count, title, url, permalink, body (first 6,000 chars). With `--format ndjson`: `<sub>.posts.ndjson`, one JSON item per line |
 | `<sub>.titles.txt` | one line per post: `date \| score \| comments \| flair \| title \| link`, for skimming |
-| `<sub>.comments.json` | comments, with `--comments` (body capped at 4,000 chars) |
+| `<sub>.comments.json` | comments, with `--comments` (body capped at 4,000 chars). With `--format ndjson`: `<sub>.comments.ndjson`, one JSON item per line |
 | `thread-<id>.json` | with `--thread`: the post plus its whole comment tree, flattened with a `depth` field |
 
 and prints a single line on stdout:
@@ -76,7 +76,7 @@ node reddit-pull.mjs --thread 1abc23 --out ./out
 node reddit-pull.mjs --help
 ```
 
-Options: `--sub` (repeatable), `--after`, `--before`, `--comments`, `--max-pages` (pages of 100, default 30), `--grep`, `--min-score`, `--out`, `--find-subs`, `--thread`, `--api-base`. Set `REDDIT_PULL_UA` to change the User-Agent.
+Options: `--sub` (repeatable), `--after`, `--before`, `--comments`, `--max-pages` (pages of 100, default 30), `--grep`, `--min-score`, `--format` (`json` by default, or `ndjson` for one item per line), `--out`, `--find-subs`, `--thread`, `--api-base`. Set `REDDIT_PULL_UA` to change the User-Agent.
 
 Run the tests (offline, against a local mock of the API):
 
@@ -120,7 +120,7 @@ This tool is a thin client for a **free, volunteer-run service**. Be a good gues
 ## Roadmap
 
 - Resume and incremental pulls (only items newer than the last run).
-- Optional `--fields` to shrink output, and a `--format ndjson` for streaming into other tools.
+- Optional `--fields` to shrink output.
 - A proxy-friendly mode and a configurable request spacing.
 
 ## History

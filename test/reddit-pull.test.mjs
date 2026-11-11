@@ -112,6 +112,38 @@ test('CLI usage errors exit 2 with JSON', async () => {
   assert.equal(JSON.parse(r.out.trim()).ok, false);
 });
 
+test('parseArgs reads --format and rejects bad values', () => {
+  assert.equal(parseArgs(['--sub', 'a']).format, 'json');
+  assert.equal(parseArgs(['--sub', 'a', '--format', 'ndjson']).format, 'ndjson');
+  assert.throws(() => parseArgs(['--sub', 'a', '--format', 'yaml']), /--format must be json or ndjson/);
+});
+
+test('CLI --format ndjson writes one JSON item per line and lists those files', async () => {
+  const comment = (i) => ({ id: `c${i}`, subreddit: 'demo', link_id: 't3_p1', parent_id: 't3_p1',
+    created_utc: 1_700_000_000 - i, author: 'a', score: i, body: `comment ${i}` });
+  const srv = await mock((req, res) => {
+    if (req.url.startsWith('/comments/')) return json(res, [comment(1), comment(2), comment(3)]);
+    json(res, [post(1), post(2), post(3)]);
+  });
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'rp-'));
+  const r = await cli(['--sub', 'demo', '--comments', '--format', 'ndjson', '--out', out, '--api-base', `http://127.0.0.1:${srv.address().port}`]);
+  srv.close();
+  assert.equal(r.code, 0, r.err);
+  const res = JSON.parse(r.out.trim());
+  assert.equal(res.ok, true);
+  assert.equal(res.subs[0].posts, 3);
+  assert.equal(res.subs[0].comments, 3);
+  const files = res.subs[0].files.map((f) => path.basename(f));
+  assert.deepEqual(files, ['demo.posts.ndjson', 'demo.titles.txt', 'demo.comments.ndjson']);
+  assert.ok(!fs.existsSync(path.join(out, 'demo.posts.json')));
+  assert.ok(!fs.existsSync(path.join(out, 'demo.comments.json')));
+  for (const [name, n] of [['demo.posts.ndjson', 3], ['demo.comments.ndjson', 3]]) {
+    const lines = fs.readFileSync(path.join(out, name), 'utf8').trim().split('\n');
+    assert.equal(lines.length, n);
+    for (const line of lines) assert.equal(typeof JSON.parse(line), 'object');
+  }
+});
+
 test('CLI thread mode flattens the tree', async () => {
   const node = (id, kids) => ({ kind: 't1', data: { id, created_utc: 1_700_000_000, link_id: 't3_p1', body: id, replies: kids ? { data: { children: kids } } : '' } });
   const srv = await mock((req, res) => {

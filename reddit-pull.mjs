@@ -7,12 +7,14 @@
 //
 // Usage:
 //   node reddit-pull.mjs --sub hackios [--sub LocalLLaMA ...] [--after 2026-09-01] [--before 2026-11-01]
-//                        [--comments] [--max-pages 30] [--grep "claude code|subagent"] [--min-score 20] --out <dir>
+//                        [--comments] [--max-pages 30] [--grep "claude code|subagent"] [--min-score 20]
+//                        [--format json|ndjson] --out <dir>
 //   node reddit-pull.mjs --find-subs <prefix>          list subreddits by name prefix with subscriber counts
 //   node reddit-pull.mjs --thread <postId> --out <dir> one post and its whole comment tree, flattened
 //   node reddit-pull.mjs --help
 //
-// Output: files in --out (<sub>.posts.json, <sub>.comments.json, <sub>.titles.txt, thread-<id>.json) and ONE JSON
+// Output: files in --out (<sub>.posts.json, <sub>.comments.json — or .ndjson with --format ndjson —,
+// <sub>.titles.txt, thread-<id>.json) and ONE JSON
 // line on stdout describing what was written, so an agent can check the result. Progress goes to stderr.
 // Exit 0 on success (even with zero results), 1 on failure, 2 on a usage error.
 //
@@ -36,6 +38,7 @@ const HELP = `reddit-pull: public Reddit posts and comments from the Arctic Shif
   --max-pages <n>     pages of 100 per sub and kind (default 30)
   --grep <regex>      keep items whose title or body matches (case-insensitive)
   --min-score <n>     keep items with at least this score
+  --format <fmt>      posts/comments file format: json (default) or ndjson (one item per line)
   --out <dir>         output directory (required for --sub and --thread)
   --find-subs <pfx>   list subreddits whose name starts with pfx
   --thread <postId>   pull one post with its full comment tree
@@ -44,7 +47,7 @@ const HELP = `reddit-pull: public Reddit posts and comments from the Arctic Shif
 Env: REDDIT_PULL_UA sets the User-Agent; REDDIT_PULL_RETRY_MS the retry step (default 2500). One JSON line on stdout; progress on stderr.`;
 
 export function parseArgs(args) {
-  const opt = { subs: [], comments: false, maxPages: 30, minScore: -Infinity, base: DEFAULT_BASE };
+  const opt = { subs: [], comments: false, maxPages: 30, minScore: -Infinity, format: 'json', base: DEFAULT_BASE };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     const v = () => {
@@ -58,6 +61,7 @@ export function parseArgs(args) {
     else if (a === '--max-pages') opt.maxPages = Number(v());
     else if (a === '--grep') opt.grep = new RegExp(v(), 'i');
     else if (a === '--min-score') opt.minScore = Number(v());
+    else if (a === '--format') opt.format = v();
     else if (a === '--out') opt.out = v();
     else if (a === '--find-subs') opt.findSubs = v();
     else if (a === '--thread') opt.thread = v();
@@ -66,6 +70,7 @@ export function parseArgs(args) {
     else throw new Error(`unknown argument ${a}`);
   }
   if (!Number.isFinite(opt.maxPages) || opt.maxPages < 1) throw new Error('--max-pages must be a positive number');
+  if (opt.format !== 'json' && opt.format !== 'ndjson') throw new Error('--format must be json or ndjson');
   return opt;
 }
 
@@ -150,6 +155,15 @@ async function pullWindow(opt, stats, kind, sub) {
   return out;
 }
 
+// Write an item list as a JSON array, or as NDJSON (one JSON item per line) when format is 'ndjson'.
+function writeItems(file, items, format) {
+  if (format === 'ndjson') {
+    fs.writeFileSync(file, items.map((x) => JSON.stringify(x)).join('\n') + (items.length ? '\n' : ''));
+  } else {
+    fs.writeFileSync(file, JSON.stringify(items, null, 1));
+  }
+}
+
 export async function run(opt) {
   const stats = { failed: 0 };
   if (opt.findSubs) {
@@ -174,16 +188,17 @@ export async function run(opt) {
     const posts = (await pullWindow(opt, stats, 'posts', sub)).map(pickPost)
       .filter((p) => p.score >= opt.minScore && matches(p, opt.grep))
       .sort((a, b) => b.score - a.score);
-    const files = [path.join(opt.out, `${sub}.posts.json`), path.join(opt.out, `${sub}.titles.txt`)];
-    fs.writeFileSync(files[0], JSON.stringify(posts, null, 1));
+    const ext = opt.format === 'ndjson' ? 'ndjson' : 'json';
+    const files = [path.join(opt.out, `${sub}.posts.${ext}`), path.join(opt.out, `${sub}.titles.txt`)];
+    writeItems(files[0], posts, opt.format);
     fs.writeFileSync(files[1], posts.map((p) => [p.t, p.score, p.n, (p.flair || '-').slice(0, 14), p.title, p.link].join(' | ')).join('\n'));
     let nComments = 0;
     if (opt.comments) {
       const comments = (await pullWindow(opt, stats, 'comments', sub)).map(pickComment)
         .filter((c) => c.score >= opt.minScore && matches(c, opt.grep));
       nComments = comments.length;
-      files.push(path.join(opt.out, `${sub}.comments.json`));
-      fs.writeFileSync(files[2], JSON.stringify(comments, null, 1));
+      files.push(path.join(opt.out, `${sub}.comments.${ext}`));
+      writeItems(files[2], comments, opt.format);
     }
     result.subs.push({ sub, posts: posts.length, comments: opt.comments ? nComments : undefined, files });
   }
